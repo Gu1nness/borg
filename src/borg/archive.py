@@ -1167,12 +1167,14 @@ class FilesystemObjectProcessors:
 
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
-                 chunker_params, show_progress):
+                 chunker_params, show_progress,
+                 print_file_status):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
         self.add_item = add_item
         self.process_file_chunks = process_file_chunks
+        self.print_file_status = print_file_status
         self.show_progress = show_progress
 
         self.hard_links = {}
@@ -1260,6 +1262,7 @@ class FilesystemObjectProcessors:
             gid=gid, group=group,
             mtime=t, atime=t, ctime=t,
         )
+        self.print_file_status(item.mode, item.path)
         self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
         item.get_size(memorize=True)
         self.stats.nfiles += 1
@@ -1305,6 +1308,8 @@ class FilesystemObjectProcessors:
                     if chunks is not None:
                         item.chunks = chunks
                     else:
+                        self.print_file_status(status, path)
+                        status = None
                         with backup_io('read'):
                             self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
                         if is_win32:
@@ -1957,6 +1962,7 @@ class ArchiveRecreater:
             if self.dry_run:
                 self.print_file_status('-', item.path)
             else:
+                self.print_file_status(file_status(item.mode), item.path)
                 self.process_item(archive, target, item)
         if self.progress:
             target.stats.show_progress(final=True)
@@ -1966,7 +1972,6 @@ class ArchiveRecreater:
             self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
         target.add_item(item, stats=target.stats)
-        self.print_file_status(file_status(item.mode), item.path)
 
     def process_chunks(self, archive, target, item):
         if not self.recompress and not target.recreate_rechunkify:
